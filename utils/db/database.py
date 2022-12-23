@@ -15,17 +15,17 @@ class Database:
         """
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS specialities("
-                            "id INT PRIMARY KEY,"
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
                             "speciality VARCHAR)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users_groups("
-                            "id INT PRIMARY KEY,"
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
                             "user_group VARCHAR,"
                             "parent_speciality INTEGER,"
                             "FOREIGN KEY(parent_speciality) REFERENCES specialities(id) ON DELETE CASCADE)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users("
-                            "id INTEGER PRIMARY KEY,"
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
                             "user_id INTEGER NOT NULL,"
                             "full_name VARCHAR NOT NULL,"
                             "sex VARCHAR NOT NULL,"
@@ -35,11 +35,11 @@ class Database:
                             "FOREIGN KEY(user_group) REFERENCES users_groups(id) ON DELETE CASCADE)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS links("
-                            "id INTEGER PRIMARY KEY,"
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
                             "link VARCHAR NOT NULL)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS meetings("
-                            "id INTEGER PRIMARY KEY,"
+                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
                             "first_user INTEGER,"
                             "second_user INTEGER,"
                             "link INTEGER,"
@@ -49,24 +49,24 @@ class Database:
 
     async def fetchone(self, query, args=None):
         if args:
-            res = self.cursor.execute(query, args)
+            self.cursor.execute(query, args)
         else:
-            res = self.cursor.execute(query)
-        return res.fetchone()
+            self.cursor.execute(query)
+        return self.cursor.fetchone()
 
     async def fetchall(self, query, args=None):
         if args:
-            res = self.cursor.execute(query, args)
+            self.cursor.execute(query, args)
         else:
-            res = self.cursor.execute(query)
-        return res.fetchall()
+            self.cursor.execute(query)
+        return self.cursor.fetchall()
 
     async def fetchmany(self, query, size, args=None):
         if args:
-            res = self.cursor.execute(query, args)
+            self.cursor.execute(query, args)
         else:
-            res = self.cursor.execute(query)
-        return res.fetchmany(size)
+            self.cursor.execute(query)
+        return self.cursor.fetchmany(size)
 
     async def query(self, query, args=None):
         if args:
@@ -75,3 +75,10 @@ class Database:
             self.cursor.execute(query)
 
         self.connection.commit()
+
+    async def in_database(self, table, column, value):
+        self.cursor.execute(f"SELECT EXISTS(SELECT 1 FROM {table} WHERE {column} = {value})")
+        if self.cursor.fetchone():
+            return True
+
+        return False
