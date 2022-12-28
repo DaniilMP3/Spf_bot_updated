@@ -47,28 +47,28 @@ class Database:
                             "FOREIGN KEY(first_user) REFERENCES users(id),"
                             "FOREIGN KEY(second_user) REFERENCES users(id) ON DELETE CASCADE)")
 
-    async def fetchone(self, query, args=None):
+    def fetchone(self, query, args=None):
         if args:
             self.cursor.execute(query, args)
         else:
             self.cursor.execute(query)
         return self.cursor.fetchone()
 
-    async def fetchall(self, query, args=None):
+    def fetchall(self, query, args=None):
         if args:
             self.cursor.execute(query, args)
         else:
             self.cursor.execute(query)
         return self.cursor.fetchall()
 
-    async def fetchmany(self, query, size, args=None):
+    def fetchmany(self, query, size, args=None):
         if args:
             self.cursor.execute(query, args)
         else:
             self.cursor.execute(query)
         return self.cursor.fetchmany(size)
 
-    async def query(self, query, args=None):
+    def query(self, query, args=None):
         if args:
             self.cursor.execute(query, args)
         else:
@@ -76,7 +76,7 @@ class Database:
 
         self.connection.commit()
 
-    async def in_database(self, table, column, value):
+    def in_database(self, table, column, value):
         self.cursor.execute(f"SELECT EXISTS(SELECT 1 FROM {table} WHERE {column} = {value})")
         if self.cursor.fetchone():
             return True
