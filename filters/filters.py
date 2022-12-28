@@ -1,6 +1,7 @@
 from aiogram.dispatcher.filters import Filter
 from aiogram.types import Message
-from create_bot import db, ADMINS
+from create_bot import ADMINS
+from db_instance import db
 
 
 class IsRegistered(Filter):

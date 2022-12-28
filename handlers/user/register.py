@@ -1,11 +1,12 @@
 import re
 from aiogram import types, Dispatcher
-from create_bot import dp, db
+from create_bot import dp
 from aiogram.dispatcher.filters import Text
 from middleware.antiflood import rate_limit
 from filters import IsNotRegistered
 from states import Register
 from aiogram.dispatcher import FSMContext
+from db_instance import db
 
 
 @dp.message_handler(IsNotRegistered(), commands=["register"], state=None)
