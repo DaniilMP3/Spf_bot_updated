@@ -15,17 +15,17 @@ class Database:
         """
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS specialities("
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                            "id INTEGER PRIMARY KEY NOT NULL,"
                             "speciality VARCHAR)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users_groups("
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                            "id INTEGER PRIMARY KEY NOT NULL,"
                             "user_group VARCHAR,"
                             "parent_speciality INTEGER,"
                             "FOREIGN KEY(parent_speciality) REFERENCES specialities(id) ON DELETE CASCADE)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users("
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                            "id INTEGER PRIMARY KEY NOT NULL,"
                             "user_id INTEGER NOT NULL,"
                             "full_name VARCHAR NOT NULL,"
                             "sex VARCHAR NOT NULL,"
@@ -35,11 +35,11 @@ class Database:
                             "FOREIGN KEY(user_group) REFERENCES users_groups(id) ON DELETE CASCADE)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS links("
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                            "id INTEGER PRIMARY KEY NOT NULL,"
                             "link VARCHAR NOT NULL)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS meetings("
-                            "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,"
+                            "id INTEGER PRIMARY KEY NOT NULL,"
                             "first_user INTEGER,"
                             "second_user INTEGER,"
                             "link INTEGER,"
@@ -74,10 +74,14 @@ class Database:
         else:
             self.cursor.execute(query)
 
-        self.connection.commit()
+        if self.cursor.rowcount == 1:
+
+            self.connection.commit()
+            return True
+        return False
 
     def in_database(self, table, column, value):
-        self.cursor.execute(f"SELECT EXISTS(SELECT 1 FROM {table} WHERE {column} = {value})")
+        self.cursor.execute(f"SELECT 1 FROM {table} WHERE {column} = ?", (value,))
         if self.cursor.fetchone():
             return True
 
