@@ -25,7 +25,7 @@ async def show_hierarchy(message: types.Message):
         await message.answer("No hierarchy now.")
         return
     tree = str(cat_tree)
-    print(tree)
+    await message.answer(tree)
 
 
 @dp.message_handler(commands=['add_node'])
@@ -72,7 +72,6 @@ async def add_or_edit(message: types.Message):
         else:
             old_group, new_group = split_msg[0], split_msg[1]
             speciality = split_msg[2]
-            print(split_msg)
             was_edited = cat_tree.edit_node(old_group, new_group, parent=speciality)
             if was_edited:
                 await message.answer("Group was edited successfully!")
@@ -105,3 +104,13 @@ async def delete_node(message: types.Message):
             await message.answer("Group was deleted successfully!")
         else:
             await message.answer("Speciality or group do not exists.")
+
+
+@dp.message_handler(commands=["delete_hierarchy"])
+@rate_limit(3, "delete_hierarchy")
+async def delete_hierarchy(message: types.Message):
+    was_deleted = cat_tree.delete_all()
+    if was_deleted:
+        await message.answer("Hierarchy was fully deleted.")
+        return
+    await message.answer("Nothing to delete.")

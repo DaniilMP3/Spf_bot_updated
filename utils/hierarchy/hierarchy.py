@@ -14,10 +14,12 @@ class Hierarchy:
                 return False
         else:
             result_parent = db.fetchone("SELECT * FROM specialities WHERE speciality = ?", (parent,))
+            if not result_parent:
+                return False
 
             parent_id = result_parent[0]
             result_group = db.fetchone("SELECT * FROM users_groups WHERE user_group = ? AND parent_speciality = ?", (value, parent_id))
-            if not result_parent or result_group:
+            if result_group:
                 return False
             else:
                 db.query("INSERT INTO users_groups VALUES(?, ?, ?)", (None, value, parent_id))
@@ -54,6 +56,27 @@ class Hierarchy:
 
             elif db.query("DELETE FROM users_groups WHERE user_group = ? AND parent_speciality = ?", (value, parent_id)):
                 return True
+
+    @staticmethod
+    def delete_all():
+        if any([db.query("DELETE FROM specialities"), db.query("DELETE from users_groups")]):
+            return True
+        return False
+
+    def __str__(self):
+        res = ""
+        roots = list(db.fetchall("SELECT * FROM specialities"))
+        for r in roots:
+            speciality_name = r[1]
+            parent_id = r[0]
+
+            res += speciality_name + '\n'
+            children = list(db.fetchall("SELECT * FROM users_groups WHERE parent_speciality = ?", (parent_id,)))
+            for c in children:
+                children_name = c[1]
+                res += '\t' + '·' + children_name + '\n'
+
+        return res
 
 
 
