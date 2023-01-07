@@ -16,13 +16,14 @@ class Database:
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS specialities("
                             "id INTEGER PRIMARY KEY NOT NULL,"
-                            "speciality VARCHAR)")
+                            "speciality VARCHAR UNIQUE)")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users_groups("
                             "id INTEGER PRIMARY KEY NOT NULL,"
                             "user_group VARCHAR,"
                             "parent_speciality INTEGER,"
-                            "FOREIGN KEY(parent_speciality) REFERENCES specialities(id) ON DELETE CASCADE)")
+                            "FOREIGN KEY(parent_speciality) REFERENCES specialities(id) ON DELETE CASCADE,"
+                            "UNIQUE(user_group, parent_speciality))")
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users("
                             "id INTEGER PRIMARY KEY NOT NULL,"
