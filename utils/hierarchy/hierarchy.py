@@ -1,4 +1,7 @@
+import sqlite3
+
 from db_instance import db
+from utils.exceptions import *
 
 
 class Hierarchy:
@@ -8,54 +11,58 @@ class Hierarchy:
     @staticmethod
     def add_node(value, parent=None):
         if not parent:
-            if not db.in_database("specialities", "speciality", value):
+            try:
                 db.query("INSERT INTO specialities VALUES(?, ?)", (None, value))
-            else:
-                return False
+            except sqlite3.IntegrityError as ie:
+                raise sqlite3.IntegrityError(f"Speciality *{value}* already exists") from ie
         else:
             result_parent = db.fetchone("SELECT * FROM specialities WHERE speciality = ?", (parent,))
             if not result_parent:
-                return False
+                raise ValueError(f"Parent speciality *{parent}* doesn't exists.")
 
             parent_id = result_parent[0]
-            result_group = db.fetchone("SELECT * FROM users_groups WHERE user_group = ? AND parent_speciality = ?", (value, parent_id))
-            if result_group:
-                return False
-            else:
+            try:
                 db.query("INSERT INTO users_groups VALUES(?, ?, ?)", (None, value, parent_id))
-
-        return True
+            except sqlite3.IntegrityError as ie:
+                raise sqlite3.IntegrityError(f"Group *{value}* already exists.") from ie
 
     @staticmethod
     def edit_node(old_value, new_value, parent=None):
+        if old_value == new_value:
+            raise ValueError(f"*{old_value}* and *{new_value}* - two same values.")
+
         if not parent:
-            if not db.in_database("specialities", "speciality", old_value):
-                return False
-            else:
-                db.query("UPDATE specialities SET speciality = ? WHERE speciality = ?", (new_value, old_value))
+            was_added = db.query("UPDATE specialities SET speciality = ? WHERE speciality = ?",
+                                 (new_value, old_value))
+            if not was_added:
+                raise ExistenceError(f"Speciality *{old_value}* doesn't exists.")
         else:
-            if db.in_database("users_groups", "user_group", new_value):
-                return False
-            elif db.query("UPDATE users_groups SET user_group = ? WHERE user_group = ?", (new_value, old_value)):
-                return True
+            parent_res = db.fetchone("SELECT * FROM specialities WHERE speciality = ?", (parent,))
+            if not parent_res:
+                raise ValueError(f"Parent speciality *{parent}* doesn't exists.")
+            parent_id = parent_res[0]
+
+            was_added = db.query("UPDATE users_groups SET user_group = ? WHERE user_group = ? AND parent_speciality = ?",
+                                 (new_value, old_value, parent_id))
+
+            if not was_added:
+                raise ExistenceError(f"Group *{old_value}* doesn't exists.")
 
     @staticmethod
     def delete_node(value, parent=None):
         if not parent:
-            if not db.in_database("specialities", "speciality", value):
-                return False
-            else:
-                db.query("DELETE FROM specialities WHERE speciality = ?", (value,))
-                return True
+            was_deleted = db.query("DELETE FROM specialities WHERE speciality = ?", (value,))
+            if not was_deleted:
+                raise ExistenceError(f"Speciality {value} doesn't exists.")
         else:
-            result_parent = db.fetchone("SELECT * FROM specialities WHERE speciality = ?", (parent,))
-            parent_id = result_parent[0]
+            parent_res = db.fetchone("SELECT * FROM specialities WHERE speciality = ?", (parent,))
+            if not parent_res:
+                raise ValueError(f"Parent speciality *{parent}* doesn't exists.")
+            parent_id = parent_res[0]
 
-            if not result_parent:
-                return False
-
-            elif db.query("DELETE FROM users_groups WHERE user_group = ? AND parent_speciality = ?", (value, parent_id)):
-                return True
+            was_deleted = db.query("DELETE FROM users_groups WHERE user_group = ? AND parent_speciality = ?", (value, parent_id))
+            if not was_deleted:
+                raise ExistenceError(f"Group *{value}* doesn't exists.")
 
     @staticmethod
     def delete_all():

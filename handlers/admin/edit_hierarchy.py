@@ -1,4 +1,6 @@
 import re
+import sqlite3
+
 from filters import IsAdmin
 from aiogram import types
 from create_bot import dp
@@ -7,6 +9,7 @@ from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from create_bot import cat_tree
 from db_instance import db
+from utils.exceptions import *
 
 
 async def pre_process_string(message):
@@ -29,54 +32,58 @@ async def show_hierarchy(message: types.Message):
 
 
 @dp.message_handler(commands=['add_node'])
-@dp.message_handler(commands=['edit_node'])
-@rate_limit(3)
-async def add_or_edit(message: types.Message):
-    command = message.get_command()
+async def add_node(message: types.Message):
     msg = await pre_process_string(message)
 
     split_msg = [w.strip() for w in msg.split(',')]
     split_len = len(split_msg)
 
-    if command.startswith("/add"):
-        if split_len not in range(1, 3) or not msg:
-            await message.answer("Incorrect format.")
-
-        elif split_len == 1:
+    if split_len not in range(1, 3) or not msg:
+        await message.answer("Incorrect format.")
+    elif split_len == 1:
+        try:
             speciality = split_msg[0]
-            was_added = cat_tree.add_node(value=speciality)
-            if was_added:
-                await message.answer("Speciality was added successfully!")
-            else:
-                await message.answer("Speciality already exists.")
+            cat_tree.add_node(value=speciality)
+        except sqlite3.IntegrityError as ie:
+            await message.answer(str(ie), parse_mode="Markdown")
         else:
-            group = split_msg[0]
-            speciality = split_msg[1]
-            was_added = cat_tree.add_node(value=group, parent=speciality)
-            if was_added:
-                await message.answer("Group was added successfully!")
-            else:
-                await message.answer("Group already exists or parent speciality doesn't exists.")
+            await message.answer("Speciality was added successfully!")
 
-    elif command.startswith("/edit"):
-        if split_len not in range(2, 4):
-            await message.answer("Incorrect format.")
-
-        elif split_len == 2:
-            old_speciality, new_speciality = split_msg[0], split_msg[1]
-            was_edited = cat_tree.edit_node(old_speciality, new_speciality)
-            if was_edited:
-                await message.answer("Speciality was edited successfully!")
-            else:
-                await message.answer("Speciality doesn't exists.")
+    else:
+        try:
+            group, speciality = split_msg[0], split_msg[1]
+            cat_tree.add_node(value=group, parent=speciality)
+        except (sqlite3.IntegrityError, ValueError) as er:
+            await message.answer(str(er), parse_mode="Markdown")
         else:
-            old_group, new_group = split_msg[0], split_msg[1]
-            speciality = split_msg[2]
-            was_edited = cat_tree.edit_node(old_group, new_group, parent=speciality)
-            if was_edited:
-                await message.answer("Group was edited successfully!")
-            else:
-                await message.answer("Parent speciality or group do not exists.")
+            await message.answer("Group was added successfully!")
+
+
+@dp.message_handler(commands=['edit_node'])
+async def edit_node(message: types.Message):
+    msg = await pre_process_string(message)
+
+    split_msg = [w.strip() for w in msg.split(',')]
+    split_len = len(split_msg)
+
+    if split_len not in range(2, 4) or not msg:
+        await message.answer("Incorrect format.")
+    elif split_len == 2:
+        old_speciality, new_speciality = split_msg[0], split_msg[1]
+        try:
+            cat_tree.edit_node(old_value=old_speciality, new_value=new_speciality)
+        except (ExistenceError, ValueError) as er:
+            await message.answer(str(er), parse_mode="Markdown")
+        else:
+            await message.answer("Speciality was edited successfully!")
+    else:
+        old_group, new_group, speciality = split_msg[0], split_msg[1], split_msg[2]
+        try:
+            cat_tree.edit_node(old_value=old_group, new_value=new_group, parent=speciality)
+        except (ExistenceError, ValueError) as er:
+            await message.answer(str(er), parse_mode="Markdown")
+        else:
+            await message.answer("Group was edited successfully!")
 
 
 @dp.message_handler(commands=['delete_node'])
@@ -90,20 +97,21 @@ async def delete_node(message: types.Message):
     if split_len not in range(1, 3) or not msg:
         await message.answer("Incorrect format.")
     elif split_len == 1:
-        speciality = split_msg[0]
-        was_deleted = cat_tree.delete_node(value=speciality)
-
-        if was_deleted:
-            await message.answer("Speciality and all child groups was deleted successfully!")
+        try:
+            speciality = split_msg[0]
+            cat_tree.delete_node(value=speciality)
+        except(ExistenceError, ValueError) as er:
+            await message.answer(str(er))
         else:
-            await message.answer("Speciality doesn't exists.")
+            await message.answer("Speciality was deleted successfully!")
     else:
-        group, speciality = split_msg[0], split_msg[1]
-        was_deleted = cat_tree.delete_node(value=group, parent=speciality)
-        if was_deleted:
-            await message.answer("Group was deleted successfully!")
+        try:
+            group, speciality = split_msg[0], split_msg[1]
+            cat_tree.delete_node(value=group, parent=speciality)
+        except(ExistenceError, ValueError) as er:
+            await message.answer(str(er))
         else:
-            await message.answer("Speciality or group do not exists.")
+            await message.answer("Group was deleted successfully!")
 
 
 @dp.message_handler(commands=["delete_hierarchy"])
