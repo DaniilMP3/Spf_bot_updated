@@ -161,8 +161,9 @@ async def group_field(message: types.Message, state: FSMContext):
         course = data['course']
 
     was_registered = db.fetchone("SELECT * FROM users WHERE user_id = ?", (user_id,))
-    pk_id = was_registered[0]
+
     if was_registered:
+        pk_id = was_registered[0]
         db.query("UPDATE users SET full_name = ?, sex = ?, course = ?, user_group = ? WHERE id = ?", (full_name, sex, course, group_id, pk_id))
         await message.answer("Information was changed successfully.", reply_markup=types.ReplyKeyboardRemove())
         return
