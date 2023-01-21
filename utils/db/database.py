@@ -35,16 +35,14 @@ class Database:
                             "meetings_count INTEGER, "
                             "FOREIGN KEY(user_group) REFERENCES users_groups(id) ON DELETE CASCADE)")
 
-        self.cursor.execute("CREATE TABLE IF NOT EXISTS links("
-                            "id INTEGER PRIMARY KEY NOT NULL,"
-                            "link VARCHAR NOT NULL)")
-
         self.cursor.execute("CREATE TABLE IF NOT EXISTS meetings("
                             "id INTEGER PRIMARY KEY NOT NULL,"
                             "first_user INTEGER,"
                             "second_user INTEGER,"
-                            "link INTEGER,"
-                            "FOREIGN KEY(link) REFERENCES links(id),"
+                            "link TEXT,"
+                            "time VARCHAR,"
+                            "first_user_status VARCHAR(25),"
+                            "second_user_status VARCHAR(25),"
                             "FOREIGN KEY(first_user) REFERENCES users(id),"
                             "FOREIGN KEY(second_user) REFERENCES users(id) ON DELETE CASCADE)")
 
