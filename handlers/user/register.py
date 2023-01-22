@@ -18,20 +18,8 @@ MESSAGES = {"full_name": {"message": "Enter your full name: ", "markup": types.R
             "group": {"message": "Enter your group.", "markup": getGroupsKeyboard}}
 
 
-@dp.message_handler(state='*', commands="cancel")
-@dp.message_handler(Text(equals=cancel_cross), state="*")
-@rate_limit(3)
-async def cancel(message: types.Message, state: FSMContext):
-    current_state = await state.get_state()
-
-    if current_state is None:
-        return
-    await state.finish()
-    await message.answer("Canceled", reply_markup=types.ReplyKeyboardRemove())
-
-
-@dp.message_handler(state="*", commands="previous")
-@dp.message_handler(Text(equals=previous_state), state="*")
+@dp.message_handler(state="*", commands="previous", chat_type=types.ChatType.PRIVATE)
+@dp.message_handler(Text(equals=previous_state), state="*", chat_type=types.ChatType.PRIVATE)
 @rate_limit(1)
 async def previous(message: types.Message, state: FSMContext):
     current_state = await state.get_state() ## <class>:<state_name> ##
@@ -58,27 +46,27 @@ async def previous(message: types.Message, state: FSMContext):
             await message.answer(msg, reply_markup=markup())
 
 
-@dp.message_handler(IsNotRegistered(), commands=["register"], state=None)
+@dp.message_handler(IsNotRegistered(), commands=["register"], state=None, chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "register")
 async def start_registration(message: types.Message):
     await message.answer("Start registration. Enter your full name: ")
     await Register.first()
 
 
-@dp.message_handler(IsRegistered(), commands=["register"], state=None)
+@dp.message_handler(IsRegistered(), commands=["register"], state=None, chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "register")
 async def registration_invalid(message: types.Message):
     await message.answer("You are already registered.")
 
 
-@dp.message_handler(IsRegistered(), commands=["edit"], state=None)
+@dp.message_handler(IsRegistered(), commands=["edit"], state=None, chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "edit")
 async def start_edit(message: types.Message):
-    await message.answer("Start editing. Enter your full name:")
+    await message.answer("Start editing. Enter your full name:", reply_markup=empty_kb)
     await Register.first()
 
 
-@dp.message_handler(IsNotRegistered(), commands=["edit"], state=None)
+@dp.message_handler(IsNotRegistered(), commands=["edit"], state=None, chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "edit")
 async def edit_invalid(message: types.Message):
     await message.answer("You are not registered yet.")

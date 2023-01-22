@@ -20,7 +20,7 @@ async def pre_process_string(message):
     return msg
 
 
-@dp.message_handler(commands=['show_hierarchy'])
+@dp.message_handler(commands=['show_hierarchy'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(2, 'show_hierarchy')
 async def show_hierarchy(message: types.Message):
     res = db.fetchall("SELECT * FROM specialities")
@@ -31,7 +31,7 @@ async def show_hierarchy(message: types.Message):
     await message.answer(tree)
 
 
-@dp.message_handler(commands=['add_node'])
+@dp.message_handler(commands=['add_node'], chat_type=types.ChatType.PRIVATE)
 async def add_node(message: types.Message):
     msg = await pre_process_string(message)
 
@@ -59,7 +59,7 @@ async def add_node(message: types.Message):
             await message.answer("Group was added successfully!")
 
 
-@dp.message_handler(commands=['edit_node'])
+@dp.message_handler(commands=['edit_node'], chat_type=types.ChatType.PRIVATE)
 async def edit_node(message: types.Message):
     msg = await pre_process_string(message)
 
@@ -86,7 +86,7 @@ async def edit_node(message: types.Message):
             await message.answer("Group was edited successfully!")
 
 
-@dp.message_handler(commands=['delete_node'])
+@dp.message_handler(commands=['delete_node'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(3, 'delete_node')
 async def delete_node(message: types.Message):
     msg = await pre_process_string(message)
@@ -114,7 +114,7 @@ async def delete_node(message: types.Message):
             await message.answer("Group was deleted successfully!")
 
 
-@dp.message_handler(commands=["delete_hierarchy"])
+@dp.message_handler(commands=["delete_hierarchy"], chat_type=types.ChatType.PRIVATE)
 @rate_limit(3, "delete_hierarchy")
 async def delete_hierarchy(message: types.Message):
     was_deleted = cat_tree.delete_all()

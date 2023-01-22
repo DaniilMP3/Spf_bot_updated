@@ -5,7 +5,7 @@ from middleware.antiflood import rate_limit
 from db_instance import db
 
 
-@dp.message_handler(IsRegistered(), commands=['whoami'])
+@dp.message_handler(IsRegistered(), commands=['whoami'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(3, 'whoami')
 async def registered_whoami(message: types.Message):
     user_id = message.from_user.id
@@ -23,7 +23,7 @@ async def registered_whoami(message: types.Message):
                          f"GROUP: {user_group},")
 
 
-@dp.message_handler(IsAdmin(), commands=['whoami'])
+@dp.message_handler(IsAdmin(), commands=['whoami'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(3, 'whoami')
 async def admin_whoami(message: types.Message):
     user_id = message.from_user.id
@@ -31,7 +31,7 @@ async def admin_whoami(message: types.Message):
                          f"TELEGRAM_ID: {user_id}")
 
 
-@dp.message_handler(IsNotRegistered(), commands=['whoami'])
+@dp.message_handler(IsNotRegistered(), commands=['whoami'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(3, 'whoami')
 async def notRegistered_whoami(message: types.Message):
     user_id = message.from_user.id
