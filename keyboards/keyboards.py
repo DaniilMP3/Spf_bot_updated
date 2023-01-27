@@ -1,5 +1,6 @@
 from aiogram import types
 from db_instance import db
+from typing import Literal
 
 sex_kb = types.ReplyKeyboardMarkup().add("Male", "Female")
 
@@ -25,4 +26,13 @@ async def getGroupsKeyboard(speciality_id):
 
     kb = types.ReplyKeyboardMarkup(keyboard=[groups])
     kb.add(cancel_cross, previous_state)
+    return kb
+
+
+async def getAcceptMessageKeyboard(candidate_pk: id, user_number: Literal["first_user", "second_user"]):
+    kb = types.InlineKeyboardMarkup()
+    accept_button = types.InlineKeyboardButton("Accept", callback_data=f"accept:{user_number}:{candidate_pk}")
+    decline_button = types.InlineKeyboardButton("Accept", callback_data=f"decline:{user_number}:{candidate_pk}")
+
+    kb.add(accept_button, decline_button)
     return kb
