@@ -12,14 +12,23 @@ class QueueUser:
 @dataclass
 class Meeting:
     meeting_time_datetime: datetime
+    meeting_time_unix: Optional[int]
 
-    user_id1: int
-    user_id2:  int
+    user1_pk: int
+    user2_pk: int
 
     link_1: str
     link_2: str
 
-    meeting_time_unix: Optional[int]
+
+    def __iter__(self):
+        if self.meeting_time_unix:
+            return iter((self.meeting_time_datetime, self.meeting_time_unix,
+                         self.user1_pk, self.user2_pk, self.link_1, self.link_2))
+
+        return iter((self.meeting_time_datetime,
+                     self.user1_pk, self.user2_pk,
+                     self.link_1, self.link_2))
 
 
 @dataclass
