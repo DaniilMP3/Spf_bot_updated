@@ -47,7 +47,7 @@ async def add_node(message: types.Message):
         except sqlite3.IntegrityError as ie:
             await message.answer(str(ie), parse_mode="Markdown")
         else:
-            await message.answer("Speciality was added successfully!")
+            await message.answer(f"Speciality *{speciality}* was added successfully!", parse_mode="Markdown")
 
     else:
         try:
@@ -56,7 +56,7 @@ async def add_node(message: types.Message):
         except (sqlite3.IntegrityError, ValueError) as er:
             await message.answer(str(er), parse_mode="Markdown")
         else:
-            await message.answer("Group was added successfully!")
+            await message.answer(f"Group *{group}* was added successfully!", parse_mode="Markdown")
 
 
 @dp.message_handler(commands=['edit_node'], chat_type=types.ChatType.PRIVATE)
@@ -75,7 +75,8 @@ async def edit_node(message: types.Message):
         except (ExistenceError, ValueError) as er:
             await message.answer(str(er), parse_mode="Markdown")
         else:
-            await message.answer("Speciality was edited successfully!")
+            await message.answer(f"Speciality *{old_speciality}* was edited to *{new_speciality}* successfully!",
+                                 parse_mode="Markdown")
     else:
         old_group, new_group, speciality = split_msg[0], split_msg[1], split_msg[2]
         try:
@@ -83,7 +84,8 @@ async def edit_node(message: types.Message):
         except (ExistenceError, ValueError) as er:
             await message.answer(str(er), parse_mode="Markdown")
         else:
-            await message.answer("Group was edited successfully!")
+            await message.answer(f"Group *{old_group}* was edited to **{new_group}* successfully!",
+                                 parse_mode="Markdown")
 
 
 @dp.message_handler(commands=['delete_node'], chat_type=types.ChatType.PRIVATE)
@@ -103,7 +105,8 @@ async def delete_node(message: types.Message):
         except(ExistenceError, ValueError) as er:
             await message.answer(str(er))
         else:
-            await message.answer("Speciality was deleted successfully!")
+            await message.answer(f"Speciality *{speciality}* was deleted successfully!",
+                                 parse_mode="Markdown")
     else:
         try:
             group, speciality = split_msg[0], split_msg[1]
@@ -111,7 +114,8 @@ async def delete_node(message: types.Message):
         except(ExistenceError, ValueError) as er:
             await message.answer(str(er))
         else:
-            await message.answer("Group was deleted successfully!")
+            await message.answer(f"Group *{group}* was deleted successfully!",
+                                 parse_mode="Markdown")
 
 
 @dp.message_handler(commands=["delete_hierarchy"], chat_type=types.ChatType.PRIVATE)
