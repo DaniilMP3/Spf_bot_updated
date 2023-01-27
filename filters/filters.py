@@ -1,7 +1,8 @@
 from aiogram.dispatcher.filters import Filter
 from aiogram.types import Message
-from create_bot import ADMINS
+from create_bot import ADMINS, meetings_manager
 from db_instance import db
+from ast import literal_eval
 
 
 class IsRegistered(Filter):
@@ -28,3 +29,17 @@ class IsUser(Filter):
     async def check(self, message: Message):
         user_id = message.from_user.id
         return user_id not in ADMINS
+
+
+class InQueue(Filter):
+    async def check(self, message: Message):
+        queue_str = [i.decode('utf-8') for i in meetings_manager.lrange("queue", 0, -1)]
+        queue_ids = [literal_eval(i)["user_id"] for i in queue_str]
+        return message.from_user.id in queue_ids
+
+
+class IsWaitingForMeeting(Filter):
+    async def check(self, message: Message):
+        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("wait_room", 0, -1)]
+        return message.from_user.id in queue
+
