@@ -8,14 +8,14 @@ class IsRegistered(Filter):
     async def check(self, message: Message):
         user_id = message.from_user.id
 
-        return bool(db.fetchone("SELECT * FROM users WHERE user_id = ?", (user_id,)))
+        return bool(db.fetchone("SELECT * FROM users WHERE telegram_id = ?", (user_id,)))
 
 
 class IsNotRegistered(Filter):
     async def check(self, message: Message):
         user_id = message.from_user.id
 
-        return not bool(db.fetchone("SELECT * FROM users WHERE user_id = ?", (user_id,)))
+        return not bool(db.fetchone("SELECT * FROM users WHERE telegram_id = ?", (user_id,)))
 
 
 class IsAdmin(Filter):

@@ -9,11 +9,11 @@ from db_instance import db
 @rate_limit(3, 'whoami')
 async def registered_whoami(message: types.Message):
     user_id = message.from_user.id
-    user_data = meetings_manager.get_userInfo(user_id)
 
-    meetings_count = db.fetchone("SELECT * FROM users WHERE user_id = ?", (user_id,))[6]
+    meetings_count = db.fetchone("SELECT meetings_count FROM users WHERE telegram_id = ?", (user_id,))[0]
 
-    user_sex, user_course, user_speciality, user_group = user_data[0], user_data[1], user_data[2], user_data[3]
+    user_sex, user_course, user_speciality, user_groupId = meetings_manager.get_userInfo(user_id)
+    user_group = db.fetchone("SELECT user_group FROM users_groups WHERE id = ?", (user_groupId,))[0]
     await message.answer("STATUS: REGISTERED\n"
                          f"ACTIVITY: {meetings_count}\n"
                          f"TELEGRAM_ID: {user_id}\n"

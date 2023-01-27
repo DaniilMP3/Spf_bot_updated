@@ -148,13 +148,12 @@ async def group_field(message: types.Message, state: FSMContext):
         sex = data['sex']
         course = data['course']
 
-    was_registered = db.fetchone("SELECT * FROM users WHERE user_id = ?", (user_id,))
+    was_registered = db.fetchone("SELECT * FROM users WHERE telegram_id = ?", (user_id,))
 
     if was_registered:
         pk_id = was_registered[0]
         db.query("UPDATE users SET full_name = ?, sex = ?, course = ?, user_group = ? WHERE id = ?", (full_name, sex, course, group_id, pk_id))
         await message.answer("Information was changed successfully.", reply_markup=types.ReplyKeyboardRemove())
-        return
     else:
         db.query("INSERT INTO users VALUES(?, ?, ?, ?, ?, ?, ?)", (None, user_id, full_name, sex, course, group_id, 0))
         await message.answer("Congrats! Registration completed.", reply_markup=types.ReplyKeyboardRemove())

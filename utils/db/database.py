@@ -27,7 +27,7 @@ class Database:
 
         self.cursor.execute("CREATE TABLE IF NOT EXISTS users("
                             "id INTEGER PRIMARY KEY NOT NULL,"
-                            "user_id INTEGER NOT NULL,"
+                            "telegram_id INTEGER NOT NULL,"
                             "full_name VARCHAR NOT NULL,"
                             "sex VARCHAR NOT NULL,"
                             "course INTEGER,"
