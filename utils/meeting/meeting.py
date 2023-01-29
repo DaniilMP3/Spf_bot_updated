@@ -1,8 +1,7 @@
-import random
 import json
 import ast
 from db_instance import db
-from datetime import date, datetime
+from datetime import date, timedelta
 import datetime
 import time
 import uuid
@@ -11,6 +10,7 @@ from cfg import *
 import jwt
 from utils.exceptions import *
 from utils.data_classes import *
+from typing import Union
 
 
 _PRIORITIES = {"0": {"sex": False, "course": True, "speciality": True, "user_group": False},
@@ -40,28 +40,34 @@ class MeetingsManager:
     def __init__(self, red):
         if not any([isinstance(red, Redis), isinstance(red, StrictRedis)]):
             raise TypeError("Redis instance should be Redis or StrictRedis")
-        self._red = red
+        self.__red = red
 
     def lrange(self, key: str, from_point: int, to_point: int):
-        return self._red.lrange(key, from_point, to_point)
+        return self.__red.lrange(key, from_point, to_point)
 
-    def _queueAppend(self, value: QueueUser):
-        user_id, inQueue_since = value.user_id, value.inQueue_since
-        dic = {"user_id": user_id, "time_inQueue": inQueue_since}
-        dic_dumps = json.dumps(dic)
-        self._red.rpush("queue", dic_dumps)
+    def list_append(self, key: str, value: Union[QueueUser, bytes, memoryview, str, int, float]):
+        if isinstance(value, QueueUser):
+            user_id, inQueue_since = value
+            dic = {"user_id": user_id, "time_inQueue": inQueue_since}
+            dic_dumps = json.dumps(dic)
+            self.__red.rpush(key, dic_dumps)
+        else:
+            self.__red.rpush(key, value)
 
-    def _queuePop(self):
-        return self._red.lpop("queue")
+    def list_lrem(self, key: str, count: int, value: Union[QueueUser, bytes, memoryview, str, int, float]):
+        if isinstance(value, QueueUser):
+            user_id, inQueue_since = value
+            dic = {"user_id": user_id, "time_inQueue": inQueue_since}
+            dic_dumps = json.dumps(dic)
+            self.__red.lrem(key, count, dic_dumps)
+        else:
+            self.__red.lrem(key, count, value)
 
-    def queueRemove(self, user_id: int):
-        self._red.lrem("queue", 0, user_id)
-
-    def waitRoom_append(self, user_id: int):
-        self._red.rpush("wait_room", user_id)
-
-    def waitRoom_lrem(self, user_id: int):
-        self._red.lrem("wait_room", 0, user_id)
+    def value_exists(self, key, value: Union[bytes, memoryview, str, int, float]):
+        if self.__red.lrem(key, 0, value):
+            self.list_append(key, value)
+            return 1
+        return 0
 
     @staticmethod
     def get_userInfo(user_id: int) -> User:
@@ -102,7 +108,7 @@ class MeetingsManager:
     async def _get_partner(self, user_id1: int):
         user_sex1, user_course1, user_speciality1, user_group1 = self.get_userInfo(user_id1)
 
-        queue_bytes = self._red.lrange('queue', 0, -1)
+        queue_bytes = self.__red.lrange('queue', 0, -1)
 
         queue_list_bytes = [x.decode("UTF-8") for x in queue_bytes]
         queue = [ast.literal_eval(x) for x in queue_list_bytes]
@@ -120,7 +126,7 @@ class MeetingsManager:
 
                 if user_sex1 != user_sex2 and current_unixStamp - user2_QueueTime >= MAX_IN_QUEUE_TIME:
                     v_dumps = json.dumps(v)
-                    self._red.lrem("queue", 0, v_dumps)
+                    self.__red.lrem("queue", 0, v_dumps)
                     return user_id2
 
                 if self.isMatch(x, sex=user_sex1 == user_sex2,
@@ -128,41 +134,23 @@ class MeetingsManager:
                                 course=user_course1 == user_course2,
                                 user_group=user_group1 == user_group2):
                     v_dumps = json.dumps(v)
-                    self._red.lrem("queue", 0, v_dumps)
+                    self.__red.lrem("queue", 0, v_dumps)
                     return user_id2
 
             x += 1
 
     async def _get_meetingTime(self):
-        for i, t in enumerate(_AVAILABLE_TIMES):
-            time_split = t.split(':')
-            hour, minute, _ = time_split
+        current_time = time.strftime("%Y-%m-%d %H:%M:%S")
+        current_time = datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S")
 
-            meetings_for_current_time = db.fetchall("SELECT * FROM meetings WHERE strftime('%H', time) = ? AND"
-                                                    " strftime('%S', time) = ? ORDER BY time ASC", (hour, minute))
-            today = date.today()
+        meetings_times = db.fetchall("SELECT time FROM meetings")
+        if len(meetings_times) < JITSI_MAX_ROOMS:
+            return current_time + timedelta(minutes=1)
 
-            current_time = time.strftime("%H:%M:%S")
-            current_time = datetime.strptime(current_time, "%H:%M:%S")
+        meetings_dateTimes_list = [datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") for t in meetings_times]
 
-            current_time = current_time.replace(year=today.year, month=today.month, day=today.day)
-
-            t = datetime.strptime(t, "%H:%M:%S").replace(year=today.year, month=today.month, day=today.day)
-
-            if current_time >= t:
-                continue
-
-            delta = (t - current_time).seconds
-
-            if len(meetings_for_current_time) < JITSI_MAX_ROOMS:
-                if delta < MIN_TIME_BEFORE_MEETING:
-                    if i + 1 >= len(_AVAILABLE_TIMES):  # If no time after --> break
-                        break
-                    next_available_time = datetime.strptime(_AVAILABLE_TIMES[i + 1], "%H:%M:%S") \
-                        .replace(year=today.year, month=today.month, day=today.day)
-
-                    return next_available_time
-                return t
+        min_time = min(meetings_dateTimes_list)
+        return min_time + timedelta(minutes=1)
 
     async def create_meeting(self, user_id: int) -> Meeting:
         meeting_time = await self._get_meetingTime()
@@ -174,7 +162,7 @@ class MeetingsManager:
             current_unixStamp = int(time.time())
 
             queue_user = QueueUser(user_id=user_id, inQueue_since=current_unixStamp)
-            self._queueAppend(queue_user)
+            self.list_append("queue", queue_user)
 
             raise ExistenceError(f"No candidate now for {user_id}. Added to queue")
 
@@ -219,6 +207,5 @@ class MeetingsManager:
             "room": room_name,
             "exp": meeting_time_unix + JITSI_MEETING_TIME
         }
-
         encoded_jwt = jwt.encode(payload, JITSI_SECRET, algorithm="HS256")
         return JITSI_DOMAIN + '/' + room_name + f"?jwt={encoded_jwt}"
