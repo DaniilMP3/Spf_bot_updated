@@ -17,18 +17,6 @@ async def start(message: types.Message):
     await message.answer("Start. If you are not registered yet, enter /register.")
 
 
-@dp.message_handler(state='*', commands="cancel", chat_type=types.ChatType.PRIVATE)
-@dp.message_handler(Text(equals=cancel_cross), state="*", chat_type=types.ChatType.PRIVATE)
-@rate_limit(3)
-async def cancel(message: types.Message, state: FSMContext):
-    current_state = await state.get_state()
-
-    if current_state is None:
-        return
-    await state.finish()
-    await message.answer("Canceled", reply_markup=types.ReplyKeyboardRemove())
-
-
 loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
