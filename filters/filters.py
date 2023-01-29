@@ -38,8 +38,8 @@ class InQueue(Filter):
         return message.from_user.id in queue_ids
 
 
-class IsWaitingForMeeting(Filter):
+class IsChoosing(Filter):
     async def check(self, message: Message):
-        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("wait_room", 0, -1)]
+        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("is_choosing", 0, -1)]
         return message.from_user.id in queue
 
