@@ -11,7 +11,7 @@ from db_instance import db
 from keyboards import *
 
 
-MESSAGES = {"full_name": {"message": "Enter your full name: ", "markup": types.ReplyKeyboardRemove},
+MESSAGES = {"full_name": {"message": "Enter your full name: ", "markup": empty_kb},
             "sex": {"message" : "Enter your sex.", "markup": sex_kb},
             "course": {"message": "Enter your course(1-7).", "markup": empty_kb},
             "speciality": {"message": "Enter your speciality.", "markup": getSpecialitiesKeyboard},
@@ -46,10 +46,22 @@ async def previous(message: types.Message, state: FSMContext):
             await message.answer(msg, reply_markup=markup())
 
 
+@dp.message_handler(state='*', commands="cancel", chat_type=types.ChatType.PRIVATE)
+@dp.message_handler(Text(equals=cancel_cross), state="*", chat_type=types.ChatType.PRIVATE)
+@rate_limit(3)
+async def cancel(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+
+    if current_state is None:
+        return
+    await state.finish()
+    await message.answer("Canceled", reply_markup=types.ReplyKeyboardRemove())
+
+
 @dp.message_handler(IsNotRegistered(), commands=["register"], state=None, chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "register")
 async def start_registration(message: types.Message):
-    await message.answer("Start registration. Enter your full name: ")
+    await message.answer("Start registration. Enter your full name: ", reply_markup=empty_kb)
     await Register.first()
 
 
