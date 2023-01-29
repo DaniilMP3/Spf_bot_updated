@@ -8,6 +8,9 @@ class QueueUser:
     user_id: int
     inQueue_since: int
 
+    def __iter__(self):
+        return iter((self.user_id, self.inQueue_since))
+
 
 @dataclass
 class Meeting:
@@ -19,7 +22,6 @@ class Meeting:
 
     link_1: str
     link_2: str
-
 
     def __iter__(self):
         if self.meeting_time_unix:
