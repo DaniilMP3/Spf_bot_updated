@@ -6,9 +6,7 @@ from middleware.antiflood import rate_limit
 import asyncio
 from aiohttp import web
 from api.event_sync.event_sync import event_app, event_routes
-from keyboards import cancel_cross
-from aiogram.dispatcher.filters import Text
-from aiogram.dispatcher import FSMContext
+import logging
 
 
 @dp.message_handler(commands=['start'], state=None, chat_type=types.ChatType.PRIVATE)
@@ -21,6 +19,8 @@ loop = asyncio.new_event_loop()
 asyncio.set_event_loop(loop)
 
 runners = []
+logging.basicConfig(format='(%(levelname)s) %(asctime)s - %(name)s - %(message)s', datefmt="%Y-%m-%d %H:%M:%S",
+                    filename="logs.log", encoding="utf-8", level=logging.INFO)
 
 
 async def start_site(application, host, port, routes=None):

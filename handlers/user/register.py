@@ -9,6 +9,10 @@ from states import Register
 from aiogram.dispatcher import FSMContext
 from db_instance import db
 from keyboards import *
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 MESSAGES = {"full_name": {"message": "Enter your full name: ", "markup": empty_kb},
@@ -166,9 +170,13 @@ async def group_field(message: types.Message, state: FSMContext):
         pk_id = was_registered[0]
         db.query("UPDATE users SET full_name = ?, sex = ?, course = ?, user_group = ? WHERE id = ?", (full_name, sex, course, group_id, pk_id))
         await message.answer("Information was changed successfully.", reply_markup=types.ReplyKeyboardRemove())
+        logger.info(f"User {user_id} changes information:"
+                    f"sex: {sex}; full_name: {full_name}; group: {group}")
     else:
         db.query("INSERT INTO users VALUES(?, ?, ?, ?, ?, ?, ?)", (None, user_id, full_name, sex, course, group_id, 0))
         await message.answer("Congrats! Registration completed.", reply_markup=types.ReplyKeyboardRemove())
+        logger.info(f"User {user_id} register: "
+                    f"sex: {sex}; full_name: {full_name}; group: {group}")
 
     await state.finish()
 
