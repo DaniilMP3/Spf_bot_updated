@@ -1,5 +1,8 @@
 import json
 import ast
+
+import redis
+
 from db_instance import db
 from datetime import date, timedelta
 import datetime
@@ -10,7 +13,8 @@ from cfg import *
 import jwt
 from utils.exceptions import *
 from utils.data_classes import *
-from typing import Union
+from typing import Union, Any
+import pickle
 
 
 _PRIORITIES = {"0": {"sex": False, "course": True, "speciality": True, "user_group": False},
@@ -19,28 +23,20 @@ _PRIORITIES = {"0": {"sex": False, "course": True, "speciality": True, "user_gro
                "3": {"sex": False, "course": False, "speciality": True, "user_group": False},
                "4": {"sex": False, "course": False, "speciality": False, "user_group": False}}
 
-_AVAILABLE_TIMES = ["10:00:00", "10:20:00", "10:40:00",
-                    "11:00:00", "11:20:00", "11:40:00",
-                    "12:00:00", "12:20:00", "12:40:00",
-                    "13:00:00", "13:20:00", "13:40:00",
-                    "14:00:00", "14:20:00", "14:40:00",
-                    "15:00:00", "15:20:00", "15:40:00",
-                    "16:00:00", "16:20:00", "16:40:00",
-                    "17:00:00", "17:20:00", "17:40:00",
-                    "18:00:00", "18:20:00", "18:40:00",
-                    "19:00:00", "19:20:00", "19:40:00",
-                    "20:00:00", "20:20:00", "20:40:00",
-                    "21:00:00", "21:20:00", "21:40:00",
-                    "22:00:00", "22:20:00", "22:40:00",
-                    "23:00:00", "23:20:00", "23:40:00"]
-
 
 class MeetingsManager:
 
-    def __init__(self, red):
-        if not any([isinstance(red, Redis), isinstance(red, StrictRedis)]):
-            raise TypeError("Redis instance should be Redis or StrictRedis")
+    def __init__(self, red: Union[Redis, StrictRedis]):
         self.__red = red
+
+    def hget(self, name: str, key: str):
+        return pickle.loads(self.__red.hget(name, key))
+
+    def hset(self, name: str, key: str, value: Union[bytes, memoryview, str, int, float, dict, list]):
+        return self.__red.hset(name, key, pickle.dumps(value))
+
+    def hdel(self, name: str, key: str):
+        return self.__red.hdel(name, key)
 
     def lrange(self, key: str, from_point: int, to_point: int):
         return self.__red.lrange(key, from_point, to_point)
@@ -108,7 +104,7 @@ class MeetingsManager:
     async def _get_partner(self, user_id1: int):
         user_sex1, user_course1, user_speciality1, user_group1 = self.get_userInfo(user_id1)
 
-        queue_bytes = self.__red.lrange('queue', 0, -1)
+        queue_bytes = self.lrange("queue", 0, -1)
 
         queue_list_bytes = [x.decode("UTF-8") for x in queue_bytes]
         queue = [ast.literal_eval(x) for x in queue_list_bytes]
@@ -139,34 +135,39 @@ class MeetingsManager:
 
             x += 1
 
+        if queue: # if nobody is found by priorities - match without them
+            return queue[0]["user_id"]
+
     async def _get_meetingTime(self):
+        """
+        Returns meeting time and time when to send links on conference
+        _get_meetingTime() -> (meeting_datetime, meeting_timeUnix, send_link_now=True)
+        """
         current_time = time.strftime("%Y-%m-%d %H:%M:%S")
         current_time = datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S")
 
         meetings_times = db.fetchall("SELECT time FROM meetings")
         if len(meetings_times) < JITSI_MAX_ROOMS:
-            return current_time + timedelta(minutes=1)
+            return current_time + timedelta(minutes=1), int(time.mktime(current_time.timetuple())), True
 
         meetings_dateTimes_list = [datetime.strptime(t[0], "%Y-%m-%d %H:%M:%S") for t in meetings_times]
 
         min_time = min(meetings_dateTimes_list)
-        return min_time + timedelta(minutes=1)
+        if min_time < current_time:
+            raise GetTimeError(f"Old conference record with 'time' = {min_time} is found in database. Unable to get time")
+
+        return min_time + timedelta(minutes=15), int(time.mktime(min_time.timetuple())), False
 
     async def create_meeting(self, user_id: int) -> Meeting:
-        meeting_time = await self._get_meetingTime()
-        if meeting_time is None:
-            raise GetTimeError("Unable to get time now. For today meetings are over")
-
         candidate_id = await self._get_partner(user_id)
         if not candidate_id:
             current_unixStamp = int(time.time())
 
             queue_user = QueueUser(user_id=user_id, inQueue_since=current_unixStamp)
             self.list_append("queue", queue_user)
-
             raise ExistenceError(f"No candidate now for {user_id}. Added to queue")
 
-        meeting_time_unix = int(time.mktime(meeting_time.timetuple()))
+        meeting_datetime, meeting_time_unix, send_link_now = await self._get_meetingTime()
 
         room_name = self._get_room_name()
 
@@ -176,12 +177,12 @@ class MeetingsManager:
         user1_pk = db.fetchone("SELECT id FROM users WHERE telegram_id = ?", (user_id,))[0]
         user2_pk = db.fetchone("SELECT id FROM users WHERE telegram_id = ?", (candidate_id,))[0]
 
-        meeting = Meeting(meeting_time_datetime=meeting_time,
-                          meeting_time_unix=meeting_time_unix,
-                          user1_pk=user1_pk,
+        meeting = Meeting(user1_pk=user1_pk,
                           user2_pk=user2_pk,
                           link_1=first_link,
-                          link_2=second_link
+                          link_2=second_link,
+                          meeting_time=(meeting_datetime, meeting_time_unix),
+                          send_link_now=send_link_now
                           )
 
         return meeting
