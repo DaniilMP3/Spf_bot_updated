@@ -43,3 +43,9 @@ class IsChoosing(Filter):
         queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("is_choosing", 0, -1)]
         return message.from_user.id in queue
 
+
+class IsAccepted(Filter):
+    async def check(self, message: Message):
+        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("accepted", 0, -1)]
+        return message.from_user.id in queue
+
