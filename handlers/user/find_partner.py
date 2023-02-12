@@ -18,8 +18,8 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-async def create_tasks(delay: Optional[int], args: List[tuple[Union[Callable, Awaitable], Optional[List[Any]]]]) -> None:
-
+async def create_tasks(delay: Optional[int],
+                       args: List[tuple[Union[Callable, Awaitable], Optional[List[Any]]]]) -> None:
     """
     This function do some work with delay. Just creates task and execute it after delay.
     parameters: delay - time after which jobs are executing; args: List of jobs represented as tuples
@@ -113,20 +113,23 @@ async def find_partner(message: types.Message):
         meetings_manager.hset("message_ids", f"{user_id1}", msg1.message_id)
         meetings_manager.hset("message_ids", f"{user_id2}", msg2.message_id)
         # Task name here is ALWAYS message.from_user.id
-        jobs = [(db.query, ["DELETE FROM meetings WHERE first_user = ?", (user1_pk,)]),
-                (meetings_manager.list_lrem, ["is_choosing", 0, user_id1],),
-                (meetings_manager.list_lrem, ["is_choosing", 0, user_id2]),
-                (meetings_manager.list_lrem, ["accepted", 0, user_id1]),
-                (meetings_manager.list_lrem, ["accepted", 0, user_id2]),
-                (bot.send_message, [user_id1, msg_failure]),
-                (bot.send_message, [user_id2, msg_failure]),
-                (msg1.delete,),
-                (msg2.delete,),
-                (meetings_manager.hdel, ["message_ids", f"{user_id1}"]),
-                (meetings_manager.hdel, ["message_ids", f"{user_id2}"])
-                ]
-        loop.create_task(create_tasks(60, jobs), name=f"{user_id1}")
-        loop.create_task(create_tasks(60, jobs), name=f"{user_id2}")
+        jobs1 = [(db.query, ["DELETE FROM meetings WHERE first_user = ?", (user1_pk,)]),
+                 (meetings_manager.list_lrem, ["is_choosing", 0, user_id1],),
+                 (meetings_manager.list_lrem, ["accepted", 0, user_id1]),
+                 (bot.send_message, [user_id1, msg_failure]),
+                 (msg1.delete,),
+                 (meetings_manager.hdel, ["message_ids", f"{user_id1}"]),
+                 ]
+        jobs2 = [(db.query, ["DELETE FROM meetings WHERE first_user = ?", (user1_pk,)]),
+                 (meetings_manager.list_lrem, ["is_choosing", 0, user_id2],),
+                 (meetings_manager.list_lrem, ["accepted", 0, user_id2]),
+                 (bot.send_message, [user_id2, msg_failure]),
+                 (msg2.delete,),
+                 (meetings_manager.hdel, ["message_ids", f"{user_id2}"])
+                 ]
+        loop.create_task(create_tasks(60, jobs1), name=f"{user_id1}")
+        loop.create_task(create_tasks(60, jobs2), name=f"{user_id2}")
+        logger.info(f"User {user_id1} get in line")
 
     except ExistenceError:
         await message.answer("No candidate for you now, now you're in queue.")
@@ -150,11 +153,9 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
     meetings_manager.list_lrem("is_choosing", 0, user_id1)
     meetings_manager.list_append("accepted", user_id1)
 
-    task = await get_task_by_name(str(query.from_user.id))
-    task.cancel()
-
     link1, link2, meeting_time = \
-        db.fetchall("SELECT first_link, second_link, time FROM meetings where id = ?", (callback_data.get("meet_id"),))[0]
+        db.fetchall("SELECT first_link, second_link, time FROM meetings where id = ?", (callback_data.get("meet_id"),))[
+            0]
 
     if callback_data.get("user_number") == "second_user":  # Swap links if user is "second_user" in users table
         link1_copy = link1
@@ -167,6 +168,11 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
             await bot.send_message(user_id1, "Accepted!")
             await bot.send_message(user_id2, "Your partner is ready.")
         else:
+            task = await get_task_by_name(str(query.from_user.id))
+            task.cancel()
+            candidate_task = await get_task_by_name(str(callback_data.get("candidate_id")))
+            candidate_task.cancel()
+
             meetings_manager.list_lrem("accepted", 0, user_id1)
             meetings_manager.list_lrem("accepted", 0, user_id2)
 
@@ -176,8 +182,9 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
                 await bot.send_message(user_id1, "%s%s" % (msg, link1))
                 await bot.send_message(user_id2, "%s%s" % (msg, link2))
 
-                await create_tasks(JITSI_MEETING_TIME * 60, [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]
-                                                              )])
+                await create_tasks(JITSI_MEETING_TIME * 60,
+                                   [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]
+                                     )])
             else:
                 meetings_manager.hdel("message_ids", f"{user_id1}")
                 meetings_manager.hdel("message_ids", f"{user_id2}")
@@ -211,6 +218,9 @@ async def find_partner_deny(query: types.CallbackQuery, callback_data: dict):
 
         user_id1 = query.from_user.id
         user_id2 = callback_data.get("candidate_id")
+        candidate_task = await get_task_by_name(str(user_id2))
+
+        candidate_task.cancel()
 
         meetings_manager.list_lrem("is_choosing", 0, user_id1)
         meetings_manager.list_lrem("is_choosing", 0, user_id2)
