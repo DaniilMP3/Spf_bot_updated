@@ -42,8 +42,9 @@ class Database:
                              "first_link TEXT,"
                              "second_link TEXT,"
                              "time VARCHAR,"
-                             "FOREIGN KEY(first_user) REFERENCES users(id),"
-                             "FOREIGN KEY(second_user) REFERENCES users(id) ON DELETE CASCADE)")
+                             "FOREIGN KEY(first_user) REFERENCES users(id) ON DELETE CASCADE,"
+                             "FOREIGN KEY(second_user) REFERENCES users(id) ON DELETE CASCADE)"
+                             )
 
     def fetchone(self, query, args=None):
         if args:
