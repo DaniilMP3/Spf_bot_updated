@@ -1,6 +1,6 @@
 from datetime import datetime
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union, Tuple
 
 
 @dataclass
@@ -14,8 +14,8 @@ class QueueUser:
 
 @dataclass
 class Meeting:
-    meeting_time_datetime: datetime
-    meeting_time_unix: Optional[int]
+    meeting_time: Union[Tuple[datetime, int]]
+    send_link_now: bool
 
     user1_pk: int
     user2_pk: int
@@ -24,12 +24,9 @@ class Meeting:
     link_2: str
 
     def __iter__(self):
-        if self.meeting_time_unix:
-            return iter((self.meeting_time_datetime, self.meeting_time_unix,
-                         self.user1_pk, self.user2_pk, self.link_1, self.link_2))
 
-        return iter((self.meeting_time_datetime,
-                     self.user1_pk, self.user2_pk,
+        return iter((self.user1_pk, self.user2_pk,
+                     self.meeting_time, self.send_link_now,
                      self.link_1, self.link_2))
 
 
