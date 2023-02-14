@@ -59,7 +59,7 @@ class MeetingsManager:
         else:
             self.__red.lrem(key, count, value)
 
-    def value_exists(self, key, value: Union[bytes, memoryview, str, int, float]):
+    def value_exists_in_list(self, key: str, value: Union[bytes, memoryview, str, int, float]):
         if self.__red.lrem(key, 0, value):
             self.list_append(key, value)
             return 1

@@ -67,10 +67,10 @@ async def deny_find_partner_by_queue(message: types.Message):
     await message.answer("You already in queue.")
 
 
-@dp.message_handler(InQueue(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
+@dp.message_handler(IsAccepted(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "find_partner")
-async def deny_find_partner_by_accepted(message: types.Message):
-    await message.answer("You accepted your meeting. Wait for your partner..")
+async def deny_find_partner_by_queue(message: types.Message):
+    await message.answer("You are waiting for your partner.")
 
 
 @dp.message_handler(IsRegistered(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
@@ -164,7 +164,7 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
 
     user_id2 = callback_data.get("candidate_id")
     try:
-        if not meetings_manager.value_exists("accepted", user_id2):
+        if not meetings_manager.value_exists_in_list("accepted", user_id2):
             await bot.send_message(user_id1, "Accepted!")
             await bot.send_message(user_id2, "Your partner is ready.")
         else:
@@ -176,15 +176,22 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
             meetings_manager.list_lrem("accepted", 0, user_id1)
             meetings_manager.list_lrem("accepted", 0, user_id2)
 
+            meetings_manager.hdel("message_ids", user_id1)
+            meetings_manager.hdel("message_ids", user_id2)
+
             msg = "Your link:\n"
+            msg_to_send_after_meeting = "Congrats! Meeting was completed"
             if callback_data.get("send_link_now"):
 
                 await bot.send_message(user_id1, "%s%s" % (msg, link1))
                 await bot.send_message(user_id2, "%s%s" % (msg, link2))
 
-                await create_tasks(JITSI_MEETING_TIME * 60,
-                                   [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]
-                                     )])
+                loop.create_task(create_tasks(JITSI_MEETING_TIME,  # Send messages that meeting are over after it ends
+                                   [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]),
+                                    (bot.send_message, [user_id1, msg_to_send_after_meeting]),
+                                    (bot.send_message, [user_id2, msg_to_send_after_meeting])
+                                    ]))
+                return
             else:
                 meetings_manager.hdel("message_ids", f"{user_id1}")
                 meetings_manager.hdel("message_ids", f"{user_id2}")
@@ -200,11 +207,18 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
                 meeting_time_unix = int(time.mktime(meeting_time_datetime.timetuple()))
                 current_time_unix = int(time.time())
 
-                loop.create_task(create_tasks(meeting_time_unix - current_time_unix, jobs))
+                unix_time_delta = meeting_time_unix - current_time_unix
+                loop.create_task(create_tasks(unix_time_delta, jobs))
+                loop.create_task(create_tasks(unix_time_delta,
+                                              ([
+                                                  bot.send_message, [user_id1, msg_to_send_after_meeting],
+                                                  bot.send_message, [user_id2, msg_to_send_after_meeting],
+                                                  (db.query, ["UPDATE users SET meetings_count = meetings_count + 1 WHERE telegram_id IN [?, ?]", (user_id1, user_id2)])
+                                              ])))
 
                 logger.info(f"New meeting was created. Users: {user_id1}, {user_id2}. Start time: {meeting_time}")
 
-        await bot.delete_message(chat_id=query.message.from_user.id, message_id=query.message.message_id)
+        # await bot.delete_message(chat_id=query.message.from_user.id, message_id=query.message.message_id)
     except:
         logger.exception("Unexpected exception in 'find_partner_accept' handler")
 
@@ -227,8 +241,14 @@ async def find_partner_deny(query: types.CallbackQuery, callback_data: dict):
 
         message_id1 = meetings_manager.hget("message_ids", f"{user_id1}")
         message_id2 = meetings_manager.hget("message_ids", f"{user_id2}")
-        await bot.delete_message(chat_id=user_id1, message_id=message_id1)
-        await bot.delete_message(chat_id=user_id2, message_id=message_id2)
+        if not meetings_manager.value_exists_in_list("accepted", user_id1):
+            await bot.delete_message(user_id1, message_id1)
+
+        if not meetings_manager.value_exists_in_list("accepted", user_id2):
+            await bot.delete_message(user_id2, message_id2)
+
+        meetings_manager.list_lrem("accepted", 0, user_id1)
+        meetings_manager.list_lrem("accepted", 0, user_id2)
 
         meetings_manager.hdel("message_ids", f"{user_id1}")
         meetings_manager.hdel("message_ids", f"{user_id2}")
@@ -238,5 +258,7 @@ async def find_partner_deny(query: types.CallbackQuery, callback_data: dict):
         await bot.send_message(user_id1, "Meeting declined.")
 
         await bot.send_message(user_id2, 'Your partner decline meeting.\nTry /find_partner again')
+    except IndexError:
+        logger.error(f"No task to pop for {query.message.from_user.id}")
     except:
         logger.exception("Unexpected exception in 'find_partner_deny' handler")
