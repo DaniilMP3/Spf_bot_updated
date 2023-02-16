@@ -40,12 +40,14 @@ class InQueue(Filter):
 
 class IsChoosing(Filter):
     async def check(self, message: Message):
-        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("is_choosing", 0, -1)]
-        return message.from_user.id in queue
+        return meetings_manager.value_exists_in_list("is_choosing", message.from_user.id)
 
 
 class IsAccepted(Filter):
     async def check(self, message: Message):
-        queue = [int(i.decode('utf-8')) for i in meetings_manager.lrange("accepted", 0, -1)]
-        return message.from_user.id in queue
+        return meetings_manager.value_exists_in_list("accepted", message.from_user.id)
 
+
+class OnMeeting(Filter):
+    async def check(self, message: Message):
+        return meetings_manager.value_exists_in_list("on_meeting", message.from_user.id)

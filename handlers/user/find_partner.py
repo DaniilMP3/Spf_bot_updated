@@ -69,8 +69,14 @@ async def deny_find_partner_by_queue(message: types.Message):
 
 @dp.message_handler(IsAccepted(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
 @rate_limit(5, "find_partner")
-async def deny_find_partner_by_queue(message: types.Message):
+async def deny_find_partner_by_already_accepted(message: types.Message):
     await message.answer("You are waiting for your partner.")
+
+
+@dp.message_handler(OnMeeting(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
+@rate_limit(5, "find_partner")
+async def deny_find_partner_by_on_meeting(message: types.Message):
+    await message.answer("You are already on meeting.")
 
 
 @dp.message_handler(IsRegistered(), commands=['find_partner'], chat_type=types.ChatType.PRIVATE)
@@ -179,19 +185,26 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
             meetings_manager.hdel("message_ids", user_id1)
             meetings_manager.hdel("message_ids", user_id2)
 
+            meetings_manager.list_append("on_meeting", user_id1)
+            meetings_manager.list_append("on_meeting", user_id2)
+
             msg = "Your link:\n"
             msg_to_send_after_meeting = "Congrats! Meeting was completed"
+            jobs_to_send_after_meeting = [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]),
+                                          (db.query, ["UPDATE users SET meetings_count = meetings_count + 1 WHERE telegram_id = ?", (user_id1,)]),
+                                          (db.query, ["UPDATE users SET meetings_count = meetings_count + 1 WHERE telegram_id = ?", (user_id2,)]),
+                                          (meetings_manager.list_lrem, ["on_meeting", 0, user_id1]),
+                                          (meetings_manager.list_lrem, ["on_meeting", 0, user_id2]),
+                                          (bot.send_message, [user_id1, msg_to_send_after_meeting]),
+                                          (bot.send_message, [user_id2, msg_to_send_after_meeting])
+                                          ]
+
             if callback_data.get("send_link_now"):
 
                 await bot.send_message(user_id1, "%s%s" % (msg, link1))
                 await bot.send_message(user_id2, "%s%s" % (msg, link2))
 
-                loop.create_task(create_tasks(JITSI_MEETING_TIME,  # Send messages that meeting are over after it ends
-                                   [(db.query, ["DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),)]),
-                                    (bot.send_message, [user_id1, msg_to_send_after_meeting]),
-                                    (bot.send_message, [user_id2, msg_to_send_after_meeting])
-                                    ]))
-                return
+                loop.create_task(create_tasks(3, jobs_to_send_after_meeting))
             else:
                 meetings_manager.hdel("message_ids", f"{user_id1}")
                 meetings_manager.hdel("message_ids", f"{user_id2}")
@@ -209,29 +222,31 @@ async def find_partner_accept(query: types.CallbackQuery, callback_data: dict):
 
                 unix_time_delta = meeting_time_unix - current_time_unix
                 loop.create_task(create_tasks(unix_time_delta, jobs))
-                loop.create_task(create_tasks(unix_time_delta,
-                                              ([
-                                                  bot.send_message, [user_id1, msg_to_send_after_meeting],
-                                                  bot.send_message, [user_id2, msg_to_send_after_meeting],
-                                                  (db.query, ["UPDATE users SET meetings_count = meetings_count + 1 WHERE telegram_id IN [?, ?]", (user_id1, user_id2)])
-                                              ])))
+                loop.create_task(create_tasks(unix_time_delta + JITSI_MEETING_TIME, jobs_to_send_after_meeting))
 
-                logger.info(f"New meeting was created. Users: {user_id1}, {user_id2}. Start time: {meeting_time}")
-
-        # await bot.delete_message(chat_id=query.message.from_user.id, message_id=query.message.message_id)
+            logger.info(f"New meeting was created. Users: {user_id1}, {user_id2}. Start time: {meeting_time}")
     except:
+        # If unexpected exception - delete users from redis and delete meeting
+        await meetings_manager.fully_remove_user_from_redis(user_id1)
+        await meetings_manager.fully_remove_user_from_redis(user_id2)
+        db.query("DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),))
         logger.exception("Unexpected exception in 'find_partner_accept' handler")
+
+        msg_fail = "Something unusual just happened. Contact admin"
+        await bot.send_message(user_id1, msg_fail)
+        await bot.send_message(user_id2, msg_fail)
 
 
 @dp.callback_query_handler(acceptMessage_cb.filter(action="decline"))
 async def find_partner_deny(query: types.CallbackQuery, callback_data: dict):
     await query.answer()
+
+    user_id1 = query.from_user.id
+    user_id2 = callback_data.get("candidate_id")
     try:
         task = await get_task_by_name(str(query.from_user.id))
         task.cancel()
 
-        user_id1 = query.from_user.id
-        user_id2 = callback_data.get("candidate_id")
         candidate_task = await get_task_by_name(str(user_id2))
 
         candidate_task.cancel()
@@ -262,3 +277,12 @@ async def find_partner_deny(query: types.CallbackQuery, callback_data: dict):
         logger.error(f"No task to pop for {query.message.from_user.id}")
     except:
         logger.exception("Unexpected exception in 'find_partner_deny' handler")
+        # If unexpected exception - delete users from redis and delete meeting
+        await meetings_manager.fully_remove_user_from_redis(user_id1)
+        await meetings_manager.fully_remove_user_from_redis(user_id2)
+        db.query("DELETE FROM meetings WHERE id = ?", (callback_data.get("meet_id"),))
+        logger.exception("Unexpected exception in 'find_partner_accept' handler")
+
+        msg_fail = "Something unusual just happened. Contact admin"
+        await bot.send_message(user_id1, msg_fail)
+        await bot.send_message(user_id2, msg_fail)
