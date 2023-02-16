@@ -138,6 +138,12 @@ class MeetingsManager:
         if queue: # if nobody is found by priorities - match without them
             return queue[0]["user_id"]
 
+    async def fully_remove_user_from_redis(self, user_id: int):
+        self.__red.lrem("queue", 0, user_id)
+        self.__red.lrem("is_choosing", 0, user_id)
+        self.__red.lrem("accepted", 0, user_id)
+        self.__red.lrem("on_meeting", 0, user_id)
+
     async def _get_meetingTime(self):
         """
         Returns meeting time and time when to send links on conference
