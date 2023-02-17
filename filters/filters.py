@@ -21,8 +21,18 @@ class IsNotRegistered(Filter):
 
 class IsAdmin(Filter):
     async def check(self, message: Message):
-        user_id = message.from_user.id
-        return user_id in ADMINS
+        return bool(db.fetchone("SELECT * FROM admins WHERE telegram_id = ?", (message.from_user.id,)))
+
+
+class IsSuperUser(Filter):
+    async def check(self, message: Message):
+        is_super_user = db.fetchone("SELECT is_super_user FROM admins WHERE telegram_id = ?", (message.from_user.id,))
+        if not is_super_user:
+            return False
+        if is_super_user[0] == 0:
+            return False
+        else:
+            return True
 
 
 class IsUser(Filter):
