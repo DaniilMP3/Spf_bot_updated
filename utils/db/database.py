@@ -18,6 +18,12 @@ class Database:
                              "id INTEGER PRIMARY KEY NOT NULL,"
                              "speciality VARCHAR UNIQUE COLLATE NOCASE)")
 
+        self._cursor.execute("CREATE TABLE IF NOT EXISTS admins("
+                             "id INTEGER PRIMARY KEY NOT NULL,"
+                             "telegram_id INTEGER NOT NULL UNIQUE,"
+                             "is_super_user INTEGER NOT NULL DEFAULT 0 CHECK(is_super_user IN (0,1)))"
+                             )
+
         self._cursor.execute("CREATE TABLE IF NOT EXISTS users_groups("
                              "id INTEGER PRIMARY KEY NOT NULL,"
                              "user_group VARCHAR,"
