@@ -1,9 +1,9 @@
 # Telegram bot for speed-dating
 The main goal of the bot is to provide speed-dating system, based on Jitsi. <br />
-For each user another anonymous user with the best priority(about priorities read below) is selected ant then they'll go on online date using Jitsi.
+For each user another anonymous user with the best priority(about priorities read below) is selected and then they'll go on online date using Jitsi.
 
 # Priorities
-Priorities is a set of some factors that determine the weight of the candidate for current user:
+Priorities are a set of some factors that determine the weight of the candidate for current user:
   * University speciality
   * University course
   * University group
